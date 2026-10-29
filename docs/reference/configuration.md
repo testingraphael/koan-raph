@@ -148,7 +148,7 @@ show_fps = false            # FPS counter overlay in top-right corner (default: 
 # config.local.toml -- this machine's hardware and terminal
 art_size = 24               # album art width in terminal columns (default: 24)
 art_graphics = true         # draw covers with the terminal's graphics protocol (default: true)
-tui_theme = "koan"          # koan | ansi (default: koan)
+tui_theme = "auto"          # auto | koan | ansi (default: auto)
 queue_grouped = true        # the TUI's queue in album runs rather than a row per track (default: true)
 output_device = "My DAC"    # audio output device name (default: system default)
 rate_switch_lead_in_ms = 1000 # silence after a sample rate change (default: 1000)
@@ -198,7 +198,11 @@ Terminals that do not answer get half blocks, which is also what `art_graphics =
 
 ### TUI palette
 
-`tui_theme = "koan"` draws the [kōan theme](https://github.com/radiosilence/koan/blob/main/docs/design/koan-theme.md) in 24-bit colour where the terminal reports it, with the accent taken from the playing cover. `"ansi"` uses the terminal's own sixteen colours. No background is painted either way. Also in `config.local.toml`.
+`tui_theme = "auto"` uses the terminal's own sixteen colors in a Hyprland session and the koan palette elsewhere. Koan detects Hyprland through a nonempty `HYPRLAND_INSTANCE_SIGNATURE` or a `Hyprland` entry in `XDG_CURRENT_DESKTOP` or `XDG_SESSION_DESKTOP`. Desktop names are case-insensitive and may appear in a colon-separated list.
+
+`"koan"` explicitly selects the [kōan theme](https://github.com/radiosilence/koan/blob/main/docs/design/koan-theme.md) in 24-bit color where the terminal reports it, with the accent taken from the playing cover. `"ansi"` explicitly uses the terminal's own sixteen colors on any desktop. Existing explicit selections remain in effect. Choose `auto` in Settings, Terminal, Theme or set it in `config.local.toml` to enable automatic selection on an existing installation.
+
+The ANSI palette leaves the terminal background visible and uses named terminal colors, so the terminal controls their actual values. The default `visualizer.palette = "theme"` follows those colors too. To follow changes made by your Hyprland theme system, configure that system to update the running terminal's palette. Koan needs no separate theme file or reload hook. Whether palette changes apply immediately depends on the terminal and its reload configuration.
 
 ### Output device
 

@@ -234,8 +234,8 @@ pub struct PlaybackConfig {
     /// protocol where it supports one. Off, art is drawn in half blocks, which
     /// every terminal can show.
     pub art_graphics: bool,
-    /// The TUI's palette: `koan` for the kōan theme's colours (the cover's
-    /// accent included), `ansi` for the terminal's own sixteen.
+    /// The TUI's palette: `auto` uses the terminal's sixteen colors in Hyprland
+    /// and the kōan theme elsewhere. `koan` and `ansi` select either explicitly.
     pub tui_theme: String,
     /// The TUI's queue in album runs, rather than a row per track.
     pub queue_grouped: bool,
@@ -327,7 +327,7 @@ impl Default for PlaybackConfig {
             muted: false,
             art_size: 24,
             art_graphics: true,
-            tui_theme: "koan".into(),
+            tui_theme: "auto".into(),
             queue_grouped: true,
             rate_switch_lead_in_ms: 1000,
         }
@@ -2923,6 +2923,16 @@ fps = 30
     }
 
     // ---- persist: which file a setting lands in -------------------------
+
+    #[test]
+    fn terminal_theme_defaults_to_auto_and_keeps_explicit_choices() {
+        let cfg: PlaybackConfig = toml::from_str("").unwrap();
+        assert_eq!(cfg.tui_theme, "auto");
+        for theme in ["koan", "ansi"] {
+            let cfg: PlaybackConfig = toml::from_str(&format!("tui_theme = '{theme}'")).unwrap();
+            assert_eq!(cfg.tui_theme, theme);
+        }
+    }
 
     /// `persist` reads and writes process-global paths, so these run one at a
     /// time rather than racing each other through `set_config_dir`.

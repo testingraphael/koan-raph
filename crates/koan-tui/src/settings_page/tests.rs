@@ -5,6 +5,20 @@ fn theme() -> Theme {
     Theme::new(super::super::theme::Palette::Ansi, (125, 211, 167))
 }
 
+#[test]
+fn theme_setting_preserves_explicit_choices_and_cycles_back_to_auto() {
+    let mut cfg = Config::default();
+    assert_eq!(cfg.playback.tui_theme, "auto");
+    Setting::Theme.step(&mut cfg, true);
+    assert_eq!(cfg.playback.tui_theme, "koan");
+    Setting::Theme.step(&mut cfg, true);
+    assert_eq!(cfg.playback.tui_theme, "ansi");
+    Setting::Theme.step(&mut cfg, true);
+    assert_eq!(cfg.playback.tui_theme, "auto");
+    Setting::Theme.step(&mut cfg, false);
+    assert_eq!(cfg.playback.tui_theme, "ansi");
+}
+
 fn key(code: KeyCode) -> KeyEvent {
     KeyEvent::from(code)
 }

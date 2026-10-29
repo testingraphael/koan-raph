@@ -199,13 +199,31 @@ pub enum VisualizerPalette {
     /// The playing record's accent: its dimmed hue at the bass, the hue
     /// itself through the mids, and its light tint at the highs.
     Record((u8, u8, u8)),
+    /// The terminal's colors when the UI uses its ANSI palette.
+    Terminal,
 }
 
 impl VisualizerPalette {
+    pub fn with_theme(self, palette: super::theme::Palette, accent: (u8, u8, u8)) -> Self {
+        match self {
+            Self::Record(_) | Self::Terminal => {
+                if palette == super::theme::Palette::Ansi {
+                    Self::Terminal
+                } else {
+                    Self::Record(accent)
+                }
+            }
+            _ => self,
+        }
+    }
+
     /// A heat map's colour for an energy `0.0..=1.0`: black, up through the
     /// palette's own colours, to white. The themed palette climbs its accent;
     /// the others keep the classic blue-yellow-red.
     pub fn heat(self, energy: f32) -> Color {
+        if self == Self::Terminal {
+            return self.freq_color(energy);
+        }
         if let Self::Record(a) = self {
             let dimmed = (a.0 / 3, a.1 / 3, a.2 / 3);
             let tint = (
@@ -242,6 +260,13 @@ impl VisualizerPalette {
     pub fn matrix(self, intensity: f32, head: bool) -> Color {
         let i = intensity.clamp(0.0, 1.0);
         match self {
+            Self::Terminal => {
+                if head {
+                    Color::White
+                } else {
+                    self.freq_color(i)
+                }
+            }
             Self::Record(a) => {
                 if head {
                     let w = 0.55 + 0.45 * i;
@@ -275,10 +300,19 @@ impl VisualizerPalette {
         }
     }
 
-    /// Map a normalised frequency position (0.0..1.0) to an RGB color.
+    /// Map a normalised frequency position (0.0..1.0) to a color.
     /// For `Mono`, this is unused — the renderer uses height-based coloring instead.
     pub fn freq_color(self, t: f32) -> Color {
         match self {
+            Self::Terminal => {
+                if t < 0.33 {
+                    Color::DarkGray
+                } else if t < 0.66 {
+                    Color::Cyan
+                } else {
+                    Color::White
+                }
+            }
             Self::Mono => Color::Green, // fallback; actual mono uses height-based
             Self::Spectrum => {
                 // Bass (red/orange) → mids (cyan/blue) → highs (purple/magenta)
@@ -495,11 +529,19 @@ fn fill_reactive_bg(state: &VisualizerState, area: Rect, buf: &mut Buffer) {
         return;
     }
     let hue_t = match state.palette {
-        VisualizerPalette::Record(_) => 0.35,
+        VisualizerPalette::Record(_) | VisualizerPalette::Terminal => 0.35,
         _ => state.hue_offset().rem_euclid(1.0),
     };
     let base = state.palette.freq_color(hue_t);
-    let bg = dim(base, 1.0 - intensity * 0.35);
+    let bg = if state.palette == VisualizerPalette::Terminal {
+        if intensity < 0.5 {
+            Color::Reset
+        } else {
+            Color::DarkGray
+        }
+    } else {
+        dim(base, 1.0 - intensity * 0.35)
+    };
     let style = Style::new().bg(bg);
     for row in 0..area.height {
         for col in 0..area.width {
@@ -1075,7 +1117,7 @@ impl VisualizerState {
     /// instead.
     pub fn hue_offset(&self) -> f32 {
         match self.palette {
-            VisualizerPalette::Record(_) => 0.0,
+            VisualizerPalette::Record(_) | VisualizerPalette::Terminal => 0.0,
             _ => self.beat_hue_offset,
         }
     }
@@ -1209,6 +1251,10 @@ fn apply_matrix_overlay(state: &VisualizerState, area: Rect, buf: &mut Buffer) {
 
             // Extract brightness from original foreground color.
             let brightness = match cell.fg {
+                Color::Reset | Color::Black => 0.0,
+                Color::DarkGray => 0.2,
+                Color::Cyan => 0.5,
+                Color::White => 1.0,
                 Color::Rgb(r, g, b) => {
                     (r as f32 * 0.299 + g as f32 * 0.587 + b as f32 * 0.114) / 255.0
                 }
@@ -2061,8 +2107,12 @@ fn render_terrain(state: &VisualizerState, area: Rect, buf: &mut Buffer) {
 
     // ── Unknown Pleasures layout ────────────────────────────────────────────
     // Artist name above, album below, waveform box centered between.
-    // Pure white on black, no palette colors.
-    let white = Color::Rgb(255, 255, 255);
+    // Use terminal white when the theme follows the terminal palette.
+    let white = if state.palette == VisualizerPalette::Terminal {
+        Color::White
+    } else {
+        Color::Rgb(255, 255, 255)
+    };
     let white_style = Style::new().fg(white).add_modifier(Modifier::BOLD);
 
     // Artist label: centered, 2 rows from top of area.
@@ -2707,7 +2757,7 @@ fn render_matrix(state: &mut VisualizerState, area: Rect, buf: &mut Buffer) {
     if state.matrix_cols.len() != w {
         state.matrix_cols.clear();
         for col in 0..w {
-            let seed = col as u32 * 2654435761;
+            let seed = (col as u32).wrapping_mul(2654435761);
             state.matrix_cols.push(MatrixColumn {
                 head_y: -(hash_f32(seed) * h as f32 * 2.0),
                 speed: 0.15 + hash_f32(seed.wrapping_add(1)) * 0.25,
@@ -3187,6 +3237,105 @@ mod tests {
             VisualizerPalette::parse("garbage"),
             VisualizerPalette::Record(_)
         ));
+    }
+
+    #[test]
+    fn themed_visualizer_follows_terminal_colors_and_preserves_explicit_palettes() {
+        use super::super::theme::{MINT, Palette};
+        let theme = VisualizerPalette::parse("theme");
+        let terminal = theme.with_theme(Palette::Ansi, MINT);
+        assert_eq!(terminal, VisualizerPalette::Terminal);
+        assert_eq!(terminal.with_theme(Palette::Ansi, (255, 0, 0)), terminal);
+        assert_eq!(
+            terminal.with_theme(Palette::Koan { truecolor: true }, (255, 0, 0)),
+            VisualizerPalette::Record((255, 0, 0))
+        );
+        for palette in [
+            VisualizerPalette::Mono,
+            VisualizerPalette::Spectrum,
+            VisualizerPalette::Fire,
+            VisualizerPalette::Neon,
+        ] {
+            assert_eq!(palette.with_theme(Palette::Ansi, MINT), palette);
+        }
+        for intensity in [0.0, 0.2, 0.5, 0.8, 1.0] {
+            for color in [
+                terminal.freq_color(intensity),
+                terminal.heat(intensity),
+                terminal.matrix(intensity, false),
+                terminal.matrix(intensity, true),
+            ] {
+                assert!(!matches!(color, Color::Rgb(..) | Color::Indexed(_)));
+                assert_eq!(brighten(color, 0.7), color);
+                assert_eq!(dim(color, 0.7), color);
+            }
+        }
+    }
+
+    #[test]
+    fn every_visualizer_mode_renders_the_terminal_theme_without_rgb_colors() {
+        let mut state =
+            VisualizerState::from_config(&koan_core::config::VisualizerConfig::default());
+        let theme = Theme::new(
+            super::super::theme::Palette::Ansi,
+            super::super::theme::MINT,
+        );
+        state.palette = state
+            .palette
+            .with_theme(theme.palette, super::super::theme::MINT);
+        state.spectrum.fill(0.7);
+        state.peaks.fill(0.8);
+        state.vu_levels = [0.6, 0.7];
+        state.beat_energy = 0.5;
+        state.now_artist = "Artist".into();
+        state.now_album = "Album".into();
+        let area = Rect::new(0, 0, 40, 12);
+        for effects in [false, true] {
+            state.reactive_bg = effects;
+            state.matrix_overlay = effects;
+            loop {
+                let mut buf = Buffer::empty(area);
+                VisualizerWidget::new(&mut state, &theme).render(area, &mut buf);
+                for cell in buf.content() {
+                    assert!(
+                        !matches!(cell.fg, Color::Rgb(..) | Color::Indexed(_))
+                            && !matches!(cell.bg, Color::Rgb(..) | Color::Indexed(_)),
+                        "{:?} drew a fixed color: {cell:?}",
+                        state.mode,
+                    );
+                }
+                state.mode = state.mode.next();
+                if state.mode == VisualizerMode::Bars {
+                    break;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn terminal_visualizer_effects_keep_distinct_intensities() {
+        let mut state =
+            VisualizerState::from_config(&koan_core::config::VisualizerConfig::default());
+        state.palette = VisualizerPalette::Terminal;
+        state.reactive_bg = true;
+        let area = Rect::new(0, 0, 3, 1);
+        let mut buf = Buffer::empty(area);
+        state.beat_energy = 0.1;
+        fill_reactive_bg(&state, area, &mut buf);
+        assert_eq!(buf[(0, 0)].bg, Color::Reset);
+        state.beat_energy = 0.8;
+        fill_reactive_bg(&state, area, &mut buf);
+        assert_eq!(buf[(0, 0)].bg, Color::DarkGray);
+        for (x, color) in [Color::DarkGray, Color::Cyan, Color::White]
+            .into_iter()
+            .enumerate()
+        {
+            buf[(x as u16, 0)].set_char('*').set_fg(color);
+        }
+        apply_matrix_overlay(&state, area, &mut buf);
+        assert_eq!(buf[(0, 0)].fg, Color::DarkGray);
+        assert_eq!(buf[(1, 0)].fg, Color::Cyan);
+        assert_eq!(buf[(2, 0)].fg, Color::White);
     }
 
     #[test]

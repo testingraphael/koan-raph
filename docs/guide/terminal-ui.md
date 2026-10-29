@@ -330,11 +330,15 @@ The playing track's cover is read from the folder or the file and, for a track t
 
 ## Colour
 
-The palette is the [kōan theme](https://github.com/radiosilence/koan/blob/main/docs/design/koan-theme.md). Where the terminal reports 24-bit colour the theme is drawn exactly, and in the nearest of the 256 colours otherwise. It never paints a background, so the terminal's own shows through. `playback.tui_theme = "ansi"` returns to the terminal's own sixteen colours.
+The default `playback.tui_theme = "auto"` uses the terminal's own sixteen colors in a Hyprland session and the [kōan theme](https://github.com/radiosilence/koan/blob/main/docs/design/koan-theme.md) elsewhere. Koan detects the session through `HYPRLAND_INSTANCE_SIGNATURE`, `XDG_CURRENT_DESKTOP`, or `XDG_SESSION_DESKTOP`. Existing explicit `koan` and `ansi` settings keep their behavior. Choose `auto` in Settings, Terminal, Theme to enable detection on an existing installation.
 
-While a record plays, the accent takes its colour from the cover, worked out as the apps do: the sleeve's hue, at a lightness that reads as text on a dark ground. Where no such lightness exists for the hue, the accent colours only the progress bar, the spectrum and other marks, and text is drawn in the body colour. A sleeve with no colour in it, or with colour on only a sliver of it, leaves the accent mint, as does turning off `appearance.record_colours`, which takes effect at once.
+To follow a Hyprland theme system, configure it to update your terminal's palette. Koan uses those terminal colors directly, including for the default `theme` visualizer palette. It needs no separate palette file or reload hook. Live color changes depend on your terminal's support and reload configuration. `playback.tui_theme = "ansi"` uses terminal colors on any desktop; `"koan"` always uses koan's palette.
 
-The visualisers follow the accent too: the default `theme` palette runs from a dark shade of the accent through the accent to a light tint, in every mode, and the heat maps and matrix rain draw in it as well. `visualizer.palette = "rainbow"` is the old frequency rainbow, and `mono`, `fire` and `neon` are as they were.
+The koan palette uses 24-bit color where the terminal reports it, and the nearest of the 256 colors otherwise. Both palettes leave the terminal's background visible.
+
+With the koan palette, the accent takes its colour from the playing cover, worked out as the apps do: the sleeve's hue, at a lightness that reads as text on a dark ground. Where no such lightness exists for the hue, the accent colours only the progress bar, the spectrum and other marks, and text is drawn in the body colour. A sleeve with no colour in it, or with colour on only a sliver of it, leaves the accent mint, as does turning off `appearance.record_colours`, which takes effect at once.
+
+The visualizers follow the selected theme. With koan's palette, the default `theme` visualizer palette runs through shades of the cover accent. With the terminal palette, it uses the terminal's dark gray, cyan, and white, including for heat maps and matrix rain. Terminal colors use discrete intensity levels rather than RGB gradients. `visualizer.palette = "rainbow"` is the frequency rainbow; `mono`, `fire`, and `neon` remain explicit choices.
 
 ## Now playing
 
