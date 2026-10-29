@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.67.8
+
+### Added
+
+- **Automatic terminal colors in Hyprland.** The new default `auto` theme uses the terminal's palette in Hyprland sessions, including for the theme visualizer. Existing explicit `koan` and `ansi` choices remain in effect.
+
+### Fixed
+
+- **More space above the playback controls.** The TUI leaves a blank row between the visualizer and the transport controls.
+
 ## 0.67.7
 
 ### Security
