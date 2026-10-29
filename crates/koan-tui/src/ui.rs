@@ -175,11 +175,10 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         super::now_playing::transport_for(app, track_info.as_ref(), playing_entry.as_ref(), levels);
     app.layout.transport = transport.draw(text_area, frame.buffer_mut());
 
-    // Visualizer — renders in the space above the transport text.
-
+    // Leave one blank row between the visualizer and the transport text.
     let spectrum_height = transport_rect
         .height
-        .saturating_sub(TRANSPORT_HEIGHT_DEFAULT);
+        .saturating_sub(TRANSPORT_HEIGHT_DEFAULT + 1);
     if spectrum_height > 0 {
         let spectrum_area = Rect::new(
             transport_rect.x + art_width + 1,
@@ -1203,6 +1202,40 @@ mod tests {
         draw(&mut app, 80, 24);
         draw(&mut app, 26, 8);
         draw(&mut app, 200, 6);
+    }
+
+    #[test]
+    fn the_visualizer_leaves_a_blank_row_above_the_controls() {
+        let mut app = app_with_queue(4);
+        app.visualizer.mode = crate::visualizer::VisualizerMode::Bars;
+        app.visualizer.spectrum.fill(1.0);
+        for art_size in [4, 24, 80] {
+            app.art_size = art_size;
+            for w in [40, 100] {
+                for h in [8, 24, 60] {
+                    let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+                    terminal.draw(|f| render(f, &mut app)).unwrap();
+                    let transport = app.layout.transport_area;
+                    let text = app.layout.transport_text_area;
+                    if transport.height <= TRANSPORT_HEIGHT_DEFAULT {
+                        continue;
+                    }
+                    let buf = terminal.backend().buffer();
+                    assert!(
+                        (text.x..text.right()).all(|x| buf[(x, text.y - 1)].symbol() == " "),
+                        "the spectrum touches the controls at {w}x{h}, art size {art_size}"
+                    );
+                    if transport.height > TRANSPORT_HEIGHT_DEFAULT + 1 {
+                        assert!(
+                            (text.x..text.right()).any(|x| buf[(x, text.y - 2)].symbol() != " "),
+                            "the spectrum should still render above the gap"
+                        );
+                    }
+                    assert!(!app.layout.transport.controls.is_empty());
+                    assert!(app.layout.transport.seek.width > 0);
+                }
+            }
+        }
     }
 
     /// The counter is 14 cells wide (19 with the beat tag) — narrower areas

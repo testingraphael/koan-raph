@@ -1,0 +1,1 @@
+- **More space above the playback controls.** The TUI leaves a blank row between the visualizer and the transport controls.
