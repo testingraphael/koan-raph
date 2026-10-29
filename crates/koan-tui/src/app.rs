@@ -443,7 +443,9 @@ impl App {
         super::playlist_ops::attach(state.clone(), tx.clone());
         let cfg = koan_core::config::Config::cached();
         let ticker_divisor = (ticks_per_sec / TICKER_FPS).max(1);
-        let visualizer = VisualizerState::from_config(&cfg.visualizer);
+        let palette = Palette::detect(&cfg.playback.tui_theme);
+        let mut visualizer = VisualizerState::from_config(&cfg.visualizer);
+        visualizer.palette = visualizer.palette.with_theme(palette, super::theme::MINT);
         let viz_config = cfg.visualizer.clone();
         let (routed, lane) = super::control::router(tx.clone(), task_channel.0.clone());
         // EQ belongs to this device's player, whatever the TUI controls.
@@ -465,7 +467,7 @@ impl App {
             picker: None,
             spinner_tick: 0,
             last_click: None,
-            theme: Theme::new(Palette::detect(&cfg.playback.tui_theme), super::theme::MINT),
+            theme: Theme::new(palette, super::theme::MINT),
             layout: LayoutRects::default(),
             loading: Vec::new(),
             last_playing_path: None,
@@ -498,7 +500,7 @@ impl App {
             browse_drag: false,
             thumbs: browse::Thumbs::new(),
             accent: Accent::default(),
-            palette: Palette::detect(&cfg.playback.tui_theme),
+            palette,
             now_playing: Default::default(),
             theme_accent: super::theme::MINT,
             cfg: koan_core::config::Config::cached(),
@@ -787,9 +789,7 @@ impl App {
         if rgb != self.theme_accent {
             self.theme_accent = rgb;
             self.theme = Theme::new(self.palette, rgb);
-            if let super::visualizer::VisualizerPalette::Record(_) = self.visualizer.palette {
-                self.visualizer.palette = super::visualizer::VisualizerPalette::Record(rgb);
-            }
+            self.visualizer.palette = self.visualizer.palette.with_theme(self.palette, rgb);
         }
         self.thumbs.poll();
         while let Ok(report) = self.task_rx.try_recv() {
@@ -1882,6 +1882,10 @@ impl App {
             Setting::Theme => {
                 self.palette = Palette::detect(&cfg.playback.tui_theme);
                 self.theme = Theme::new(self.palette, self.theme_accent);
+                self.visualizer.palette = self
+                    .visualizer
+                    .palette
+                    .with_theme(self.palette, self.theme_accent);
             }
             Setting::CoverGraphics => {
                 self.art.gfx.set_graphics(cfg.playback.art_graphics);
@@ -1891,10 +1895,10 @@ impl App {
             Setting::Palette => {
                 self.visualizer.palette =
                     super::visualizer::VisualizerPalette::parse(&cfg.visualizer.palette);
-                if let super::visualizer::VisualizerPalette::Record(_) = self.visualizer.palette {
-                    self.visualizer.palette =
-                        super::visualizer::VisualizerPalette::Record(self.theme_accent);
-                }
+                self.visualizer.palette = self
+                    .visualizer
+                    .palette
+                    .with_theme(self.palette, self.theme_accent);
             }
             Setting::Offline => self.reload_library_pages(),
             _ => {}

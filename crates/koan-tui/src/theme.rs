@@ -39,7 +39,16 @@ pub enum Palette {
 impl Palette {
     /// `name` is `playback.tui_theme`.
     pub fn detect(name: &str) -> Self {
-        if name.eq_ignore_ascii_case("ansi") {
+        let hyprland = hyprland_session(
+            &std::env::var("HYPRLAND_INSTANCE_SIGNATURE").unwrap_or_default(),
+            &std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default(),
+            &std::env::var("XDG_SESSION_DESKTOP").unwrap_or_default(),
+        );
+        Self::for_session(name, hyprland)
+    }
+
+    fn for_session(name: &str, hyprland: bool) -> Self {
+        if name.eq_ignore_ascii_case("ansi") || (name.eq_ignore_ascii_case("auto") && hyprland) {
             return Self::Ansi;
         }
         let colorterm = std::env::var("COLORTERM").unwrap_or_default();
@@ -51,6 +60,15 @@ impl Palette {
             || std::env::var("TERM").is_ok_and(|t| t.contains("kitty") || t.contains("ghostty"));
         Self::Koan { truecolor }
     }
+}
+
+fn hyprland_session(signature: &str, current_desktop: &str, session_desktop: &str) -> bool {
+    !signature.trim().is_empty()
+        || [current_desktop, session_desktop].iter().any(|desktop| {
+            desktop
+                .split(':')
+                .any(|name| name.trim().eq_ignore_ascii_case("hyprland"))
+        })
 }
 
 pub struct Theme {
@@ -291,6 +309,48 @@ impl Default for Theme {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn automatic_theme_uses_terminal_colors_only_in_hyprland() {
+        assert_eq!(Palette::for_session("auto", true), Palette::Ansi);
+        assert_eq!(Palette::for_session("AUTO", true), Palette::Ansi);
+        assert!(matches!(
+            Palette::for_session("auto", false),
+            Palette::Koan { .. }
+        ));
+        for hyprland in [true, false] {
+            assert!(matches!(
+                Palette::for_session("koan", hyprland),
+                Palette::Koan { .. }
+            ));
+            assert_eq!(Palette::for_session("ansi", hyprland), Palette::Ansi);
+            assert!(matches!(
+                Palette::for_session("unknown", hyprland),
+                Palette::Koan { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn hyprland_detection_accepts_session_markers_and_desktop_lists() {
+        for (signature, current, session) in [
+            ("instance_123", "", ""),
+            ("", "Hyprland", ""),
+            ("", "", "hyprland"),
+            ("", "Other:HyPrLaNd", ""),
+            ("", "", "Hyprland:Other"),
+        ] {
+            assert!(hyprland_session(signature, current, session));
+        }
+        for (signature, current, session) in [
+            ("", "", ""),
+            ("  ", "GNOME", "gnome"),
+            ("", "sway", "sway"),
+            ("", "not-hyprland", "Hyprland-custom"),
+        ] {
+            assert!(!hyprland_session(signature, current, session));
+        }
+    }
 
     #[test]
     fn the_nearest_256_colour_is_on_xterm_levels() {

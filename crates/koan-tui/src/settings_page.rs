@@ -826,7 +826,7 @@ impl SettingsPage {
 }
 
 const REPLAYGAIN: [&str; 3] = ["off", "track", "album"];
-const THEMES: [&str; 2] = ["koan", "ansi"];
+const THEMES: [&str; 3] = ["auto", "koan", "ansi"];
 const PALETTES: [&str; 5] = ["theme", "rainbow", "mono", "fire", "neon"];
 const FRAME_RATES: [u8; 3] = [30, 60, 120];
 const SYNC_MINUTES: [u64; 5] = [0, 15, 60, 360, 1440];
@@ -905,7 +905,7 @@ impl Setting {
             Setting::ReplayGain => "the gain written into the file's tags",
             Setting::PreAmp => "on top of the gain",
             Setting::FadeOnPause => "ramp the volume instead of cutting",
-            Setting::Theme => "kōan's colours or the terminal's own",
+            Setting::Theme => "auto follows terminal colors in Hyprland",
             Setting::CoverGraphics => "images where the terminal draws them",
             Setting::ArtSize => "columns, in the transport bar",
             Setting::ShowFps => "top right",

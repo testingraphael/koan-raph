@@ -1,0 +1,1 @@
+- **Automatic terminal colors in Hyprland.** The new default `auto` theme uses the terminal's palette in Hyprland sessions, including for the theme visualizer. Existing explicit `koan` and `ansi` choices remain in effect.
