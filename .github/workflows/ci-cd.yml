@@ -48,6 +48,7 @@ jobs:
   # ── CI ──────────────────────────────────────────────────────────────────
 
   changes:
+    if: github.repository == 'radiosilence/koan'
     name: Changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -777,7 +778,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, checks]
-    if: ${{ !cancelled() && needs.checks.result == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    if: ${{ !cancelled() && github.repository == 'radiosilence/koan' && needs.checks.result == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     permissions:
       contents: read
     outputs:
