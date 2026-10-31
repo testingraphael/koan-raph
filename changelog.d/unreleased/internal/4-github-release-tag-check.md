@@ -1,0 +1,1 @@
+- **GitHub release tag lookup.** Check the tag reference before resolving its commit so a new release can proceed when its tag does not exist yet.
